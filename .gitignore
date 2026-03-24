@@ -1,0 +1,43 @@
+# Dataset - raw images, masks, overlays
+dataset/
+
+# Checkpoints and model weights
+*.pth
+*.pt
+outputs/
+**/checkpoints/
+
+# Logs
+logs/
+nohup.out
+*.log
+*.jsonl
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Conda temp
+condaenv.*.requirements.txt
+
+# W&B
+wandb/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints
+
+# Core dumps
+core.*
+*.core

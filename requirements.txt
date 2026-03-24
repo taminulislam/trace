@@ -1,0 +1,20 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch>=2.8.0
+torchvision
+torchaudio
+transformers>=4.40
+tokenizers
+accelerate
+peft>=0.10
+bitsandbytes
+wandb
+timm>=0.9
+einops
+sentencepiece
+protobuf
+safetensors
+datasets
+evaluate
+nltk
+rouge-score
+bert-score

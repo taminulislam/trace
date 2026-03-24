@@ -1,0 +1,25 @@
+seq_id,class_id,class_name,behavioural_label
+0483,0,High Forage,High Metabolic Activity (Active Rumination State)
+0484,0,High Forage,High Metabolic Activity (Active Rumination State)
+0486,0,High Forage,High Metabolic Activity (Active Rumination State)
+0488,0,High Forage,High Metabolic Activity (Active Rumination State)
+0490,0,High Forage,High Metabolic Activity (Active Rumination State)
+0491,0,High Forage,High Metabolic Activity (Active Rumination State)
+0492,0,High Forage,High Metabolic Activity (Active Rumination State)
+0493,0,High Forage,High Metabolic Activity (Active Rumination State)
+0495,0,High Forage,High Metabolic Activity (Active Rumination State)
+0496,0,High Forage,High Metabolic Activity (Active Rumination State)
+0497,0,High Forage,High Metabolic Activity (Active Rumination State)
+0498,0,High Forage,High Metabolic Activity (Active Rumination State)
+0510,0,High Forage,High Metabolic Activity (Active Rumination State)
+0499,1,Control,Balanced Homeostatic State
+0500,1,Control,Balanced Homeostatic State
+0501,1,Control,Balanced Homeostatic State
+0502,1,Control,Balanced Homeostatic State
+0503,1,Control,Balanced Homeostatic State
+0504,1,Control,Balanced Homeostatic State
+0505,2,Low Forage,Digestive Distress / Low Emission State
+0506,2,Low Forage,Digestive Distress / Low Emission State
+0507,2,Low Forage,Digestive Distress / Low Emission State
+0508,2,Low Forage,Digestive Distress / Low Emission State
+0509,2,Low Forage,Digestive Distress / Low Emission State
