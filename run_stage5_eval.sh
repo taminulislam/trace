@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run Stage 5 (E2E without LLaVA) + Evaluation + Visualization
+# Run Stage 5 (E2E without LLaVA) + Evaluation
 set -e
 
 export OPENBLAS_NUM_THREADS=8

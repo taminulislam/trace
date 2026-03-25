@@ -1,6 +1,6 @@
 #!/bin/bash
 # TRACE Full Training Pipeline
-# Runs all stages sequentially: 1 → 2 → 3 → 4 → 5 → 6
+# Runs all stages sequentially: 1 → 2 → 3 → 4 → 5
 # Usage: nohup bash run_all.sh > logs/pipeline.log 2>&1 &
 set -e
 
@@ -72,13 +72,6 @@ python src/train/train_e2e.py \
     --fusion_checkpoint "$FUSION_CKPT" \
     --llava_checkpoint "$LLAVA_CKPT" 2>&1 | tee logs/e2e_stdout.log
 echo "Stage 5 finished at: $(date)"
-
-# ---- Stage 6: DDPM (optional) ----
-echo ""
-echo ">>>>> STAGE 6: DDPM Augmentation <<<<<"
-echo "Started at: $(date)"
-python src/train/train_ddpm.py 2>&1 | tee logs/ddpm_stdout.log
-echo "Stage 6 finished at: $(date)"
 
 echo ""
 echo "========================================="

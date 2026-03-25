@@ -1,44 +1,16 @@
 # TRACE
 
-**TRACE** is a multi-stage deep learning pipeline for thermal gas segmentation and flux classification in ruminant CO₂ emission monitoring. It combines a TGAA-augmented SegFormer backbone with a VideoMAE temporal encoder, fused via an Attention Temporal Fusion (ATF) module and jointly fine-tuned end-to-end.
-
-<p align="center">
-  <img src="TRACE.png" alt="TRACE Architecture" width="800"/>
-</p>
+**TRACE** is a multi-stage deep learning pipeline for thermal gas segmentation and flux classification in ruminant CO₂ emission monitoring. It combines a TGAA-augmented SegFormer backbone with a VideoMAE temporal encoder, fused via an Asymmetric Thermal Fusion (ATF) module and jointly fine-tuned end-to-end.
 
 ---
 
 ## Highlights
 
-- **State-of-the-art segmentation** on thermal gas imagery: mIoU 0.9865, Dice 0.9914
 - **Multi-stage pipeline**: segmentation → temporal → fusion → language → end-to-end
 - **TGAA blocks** replace standard MiT self-attention for temporally-aware feature extraction
-- **ATF module** fuses spatial (SegFormer) and temporal (VideoMAE) representations
+- **ATF module** fuses mask, overlay, and background spatial streams from the SegFormer backbone
 - **LLaVA-LoRA** stage for language-grounded visual understanding
 - Supports multi-GPU DDP training out of the box
-
----
-
-## Results
-
-### Segmentation (Test Set, 789 samples)
-
-| Model | Params | mIoU | Dice | BF1 | HD (px) |
-|:------|-------:|-----:|-----:|----:|--------:|
-| **TRACE** | 27.7M | **0.9865** | **0.9914** | **0.8951** | **0.0012** |
-| LACTNet | 12.7M | 0.9626 | 0.9807 | 0.7020 | 3.1994 |
-| iFormer | 5.5M | 0.9608 | 0.9796 | 0.6933 | 3.1145 |
-| SegFormer-B2 | 24.7M | 0.9533 | 0.9754 | 0.6421 | 3.6415 |
-| SegFormer-B0 | 3.7M | 0.9537 | 0.9758 | 0.6386 | 3.5355 |
-
-### Classification (Test Set, 104 samples)
-
-| Model | Params | Accuracy | Bal. Acc | Macro-F1 | AUC-ROC |
-|:------|-------:|---------:|---------:|---------:|--------:|
-| **TRACE** | 27.7M | **0.8173** | **0.7845** | **0.7792** | **0.9412** |
-| SegFormer-B0 | 3.7M | 0.7692 | 0.7334 | 0.7296 | 0.8931 |
-| Mask2Former | 27.9M | 0.7596 | 0.6154 | 0.5623 | 0.7106 |
-| Prior2Former | 21.4M | 0.7404 | 0.5983 | 0.5475 | 0.7183 |
 
 ---
 
@@ -56,10 +28,10 @@ Stage 2 — Temporal Encoder Training
   └─ VideoMAE-Small fine-tuned on 16-frame thermal clips
 
 Stage 3 — ATF Fusion
-  └─ Attention Temporal Fusion joins spatial + temporal embeddings
+  └─ Asymmetric Thermal Fusion fuses mask, overlay, and background spatial streams
 
 Stage 4 — LLaVA LoRA
-  └─ Language-grounded visual fine-tuning with LoRA adapters
+  └─ Language-grounded visual fine-tuning with LoRA adapters on Vicuna-7B
 
 Stage 5 — End-to-End Fine-tuning
   └─ Joint optimization with differential learning rates
@@ -133,11 +105,11 @@ python src/train/train_segmentation.py
 # Stage 2: Temporal encoder
 python src/train/train_temporal.py
 
-# Stage 3: ATF Fusion (requires Stage 1 + 2 checkpoints)
+# Stage 3: ATF Fusion (requires Stage 1 checkpoint)
 python src/train/train_fusion.py \
     --seg_checkpoint outputs/checkpoints/segmentation/segmentation_latest.pt
 
-# Stage 4: LLaVA LoRA (requires Stage 1 + 2 + 3 checkpoints)
+# Stage 4: LLaVA LoRA (requires Stage 1, 2, and 3 checkpoints)
 python src/train/train_llava.py \
     --seg_checkpoint outputs/checkpoints/segmentation/segmentation_latest.pt \
     --temporal_checkpoint outputs/checkpoints/temporal/temporal_latest.pt \
@@ -203,14 +175,13 @@ TRACE/
 │   ├── data/            # Dataset, augmentation, clip sampling
 │   ├── models/          # TRACE, TGAA, ATF, temporal encoder, LLaVA-LoRA
 │   ├── train/           # Per-stage training scripts
-│   ├── eval/            # Evaluation and visualization
+│   ├── eval/            # Evaluation
 │   └── utils/           # Config dataclasses, trainer utilities
-├── scripts/             # Visualization and comparison scripts
+├── scripts/             # Comparison scripts
 ├── annotations/         # Dataset split CSVs
 ├── run_all.sh           # Full pipeline runner
 ├── requirements.txt
-├── environment.yml
-└── TRACE.png            # Architecture diagram
+└── environment.yml
 ```
 
 ---
