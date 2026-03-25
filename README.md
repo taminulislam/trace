@@ -14,6 +14,12 @@
 
 ---
 
+## Architecture
+
+![TRACE Architecture](assets/architecture.png)
+
+---
+
 ## Pipeline Overview
 
 TRACE trains in 5 sequential stages:
@@ -93,7 +99,7 @@ annotations/
 ### Full pipeline (all stages)
 
 ```bash
-bash run_all.sh
+bash scripts/run_all.sh
 ```
 
 ### Individual stages
@@ -177,9 +183,18 @@ TRACE/
 │   ├── train/           # Per-stage training scripts
 │   ├── eval/            # Evaluation
 │   └── utils/           # Config dataclasses, trainer utilities
-├── scripts/             # Comparison scripts
+├── scripts/             # Shell runners + comparison scripts
+│   ├── run_all.sh       # Full pipeline runner
+│   ├── run_segmentation.sh
+│   ├── run_temporal.sh
+│   ├── run_fusion.sh
+│   ├── run_llava.sh
+│   ├── run_e2e.sh
+│   ├── run_eval.sh
+│   ├── run_stage5_eval.sh
+│   └── compare_results.py
+├── assets/              # Figures (architecture diagram, etc.)
 ├── annotations/         # Dataset split CSVs
-├── run_all.sh           # Full pipeline runner
 ├── requirements.txt
 └── environment.yml
 ```
