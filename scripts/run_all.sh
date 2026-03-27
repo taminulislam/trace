@@ -1,6 +1,6 @@
 #!/bin/bash
 # TRACE Full Training Pipeline
-# Runs all stages sequentially: 1 → 2 → 3 → 4 → 5
+# Runs all stages sequentially: 1 → 2 → 3 → 4
 # Usage: nohup bash run_all.sh > logs/pipeline.log 2>&1 &
 set -e
 
@@ -49,29 +49,17 @@ echo "Started at: $(date)"
 python src/train/train_fusion.py --seg_checkpoint "$SEG_CKPT" 2>&1 | tee logs/fusion_stdout.log
 echo "Stage 3 finished at: $(date)"
 
-# ---- Stage 4: LLaVA LoRA ----
+# ---- Stage 4: End-to-End ----
 TEMP_CKPT="outputs/checkpoints/temporal/temporal_latest.pt"
 FUSION_CKPT="outputs/checkpoints/fusion/fusion_latest.pt"
 echo ""
-echo ">>>>> STAGE 4: LLaVA LoRA <<<<<"
-echo "Started at: $(date)"
-python src/train/train_llava.py \
-    --seg_checkpoint "$SEG_CKPT" \
-    --temporal_checkpoint "$TEMP_CKPT" \
-    --fusion_checkpoint "$FUSION_CKPT" 2>&1 | tee logs/llava_stdout.log
-echo "Stage 4 finished at: $(date)"
-
-# ---- Stage 5: End-to-End ----
-LLAVA_CKPT="outputs/checkpoints/llava/llava_latest.pt"
-echo ""
-echo ">>>>> STAGE 5: End-to-End Fine-tuning <<<<<"
+echo ">>>>> STAGE 4: End-to-End Fine-tuning <<<<<"
 echo "Started at: $(date)"
 python src/train/train_e2e.py \
     --seg_checkpoint "$SEG_CKPT" \
     --temporal_checkpoint "$TEMP_CKPT" \
-    --fusion_checkpoint "$FUSION_CKPT" \
-    --llava_checkpoint "$LLAVA_CKPT" 2>&1 | tee logs/e2e_stdout.log
-echo "Stage 5 finished at: $(date)"
+    --fusion_checkpoint "$FUSION_CKPT" 2>&1 | tee logs/e2e_stdout.log
+echo "Stage 4 finished at: $(date)"
 
 echo ""
 echo "========================================="

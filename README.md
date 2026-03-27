@@ -1,51 +1,49 @@
 # TRACE
 
-**TRACE** is a multi-stage deep learning pipeline for thermal gas segmentation and flux classification in ruminant CO₂ emission monitoring. It combines a TGAA-augmented SegFormer backbone with a VideoMAE temporal encoder, fused via an Asymmetric Thermal Fusion (ATF) module and jointly fine-tuned end-to-end.
+**TRACE** (Thermal Recognition Attentive-Framework for CO2 Emissions from Livestock) is a unified framework for per-frame CO2 plume segmentation and clip-level emission flux classification from mid-wave infrared (MWIR) thermal video. It combines a TGAA-augmented SegFormer backbone with an Attention-based Temporal Fusion (ATF) module, trained via a four-stage progressive curriculum.
 
 ---
 
-## Highlights
+## ✨ Highlights
 
-- **Multi-stage pipeline**: segmentation → temporal → fusion → language → end-to-end
-- **TGAA blocks** replace standard MiT self-attention for temporally-aware feature extraction
-- **ATF module** fuses mask, overlay, and background spatial streams from the SegFormer backbone
-- **LLaVA-LoRA** stage for language-grounded visual understanding
-- Supports multi-GPU DDP training out of the box
-
----
-
-## Architecture
-
-![TRACE Architecture](assets/architecture.png)
+- 🔬 **TGAA encoder**: gas-conditioned transformer encoder that incorporates per-pixel CO₂ intensity as a spatial supervisory signal to direct self-attention toward high-emission regions
+- 🔗 **ATF module**: fuses mask, encoder, and CNN streams via cross-frame attention for clip-level flux classification
+- 📋 **Four-stage training curriculum**: segmentation warmup → temporal alignment → ATF fusion → end-to-end joint training
+- ⚡ Supports multi-GPU DDP training out of the box
 
 ---
 
-## Pipeline Overview
+## 🏗️ Architecture
 
-TRACE trains in 5 sequential stages:
+![TRACE Architecture](trace.png)
+
+---
+
+## 🔄 Pipeline Overview
+
+TRACE trains in 4 sequential stages:
 
 ```
 Stage 1 — Segmentation Pretraining
   └─ TGAA-SegFormer on thermal overlay images
-     1a: freeze backbone, train TGAA gates + decode head
-     1b: full fine-tune
+     S1(a): freeze TGAA encoder, train decode head only (BCE + Dice)
+     S1(b): unfreeze TGAA encoder, jointly train with decode head and ATF (segmentation only)
 
-Stage 2 — Temporal Encoder Training
-  └─ VideoMAE-Small fine-tuned on 16-frame thermal clips
+Stage 2 — Temporal Alignment
+  └─ Align ATF temporal stream to frozen VideoMAE-Small via MSE feature-alignment loss
+     (VideoMAE is discarded after this stage — not used at inference)
 
 Stage 3 — ATF Fusion
-  └─ Asymmetric Thermal Fusion fuses mask, overlay, and background spatial streams
+  └─ Train ATF module with classification head on clip-level flux labels
 
-Stage 4 — LLaVA LoRA
-  └─ Language-grounded visual fine-tuning with LoRA adapters on Vicuna-7B
-
-Stage 5 — End-to-End Fine-tuning
-  └─ Joint optimization with differential learning rates
+Stage 4 — End-to-End Fine-tuning
+  └─ Joint optimization: L_total = λ_seg(BCE + Dice) + λ_cls * CE
+     (λ_seg=1.0, λ_cls=0.5)
 ```
 
 ---
 
-## Installation
+## 📦 Installation
 
 ### 1. Clone the repository
 
@@ -71,9 +69,9 @@ pip install -r requirements.txt
 
 ---
 
-## Dataset
+## 📂 Dataset
 
-The CO₂ Farm Thermal Gas Dataset is not publicly available yet. Please contact the authors to request access.
+The CO2 Farm Thermal Gas Dataset is not publicly available yet. Please contact the authors to request access.
 
 Expected dataset structure:
 
@@ -94,7 +92,7 @@ annotations/
 
 ---
 
-## Training
+## 🚀 Training
 
 ### Full pipeline (all stages)
 
@@ -105,28 +103,21 @@ bash scripts/run_all.sh
 ### Individual stages
 
 ```bash
-# Stage 1: Segmentation pretraining
+# Stage 1: Segmentation pretraining (S1a + S1b)
 python src/train/train_segmentation.py
 
-# Stage 2: Temporal encoder
+# Stage 2: Temporal alignment (VideoMAE teacher)
 python src/train/train_temporal.py
 
 # Stage 3: ATF Fusion (requires Stage 1 checkpoint)
 python src/train/train_fusion.py \
     --seg_checkpoint outputs/checkpoints/segmentation/segmentation_latest.pt
 
-# Stage 4: LLaVA LoRA (requires Stage 1, 2, and 3 checkpoints)
-python src/train/train_llava.py \
-    --seg_checkpoint outputs/checkpoints/segmentation/segmentation_latest.pt \
-    --temporal_checkpoint outputs/checkpoints/temporal/temporal_latest.pt \
-    --fusion_checkpoint outputs/checkpoints/fusion/fusion_latest.pt
-
-# Stage 5: End-to-end fine-tuning
+# Stage 4: End-to-end fine-tuning (requires Stage 1, 2, 3 checkpoints)
 python src/train/train_e2e.py \
     --seg_checkpoint outputs/checkpoints/segmentation/segmentation_latest.pt \
     --temporal_checkpoint outputs/checkpoints/temporal/temporal_latest.pt \
-    --fusion_checkpoint outputs/checkpoints/fusion/fusion_latest.pt \
-    --llava_checkpoint outputs/checkpoints/llava/llava_latest.pt
+    --fusion_checkpoint outputs/checkpoints/fusion/fusion_latest.pt
 ```
 
 ### Key environment variables
@@ -147,7 +138,7 @@ torchrun --nproc_per_node=2 src/train/train_segmentation.py
 
 ---
 
-## Evaluation
+## 📊 Evaluation
 
 ```bash
 python src/eval/evaluate.py \
@@ -158,7 +149,7 @@ python src/eval/evaluate.py \
 
 ---
 
-## Pre-trained Models
+## 🤗 Pre-trained Models
 
 Pre-trained checkpoints will be available on HuggingFace Hub:
 
@@ -167,19 +158,19 @@ Pre-trained checkpoints will be available on HuggingFace Hub:
 | Checkpoint | Stage | Description |
 |:-----------|:------|:------------|
 | `trace-segmentation` | Stage 1 | TGAA-SegFormer segmentation |
-| `trace-temporal` | Stage 2 | VideoMAE temporal encoder |
+| `trace-temporal` | Stage 2 | VideoMAE temporal alignment |
 | `trace-fusion` | Stage 3 | ATF fusion model |
-| `trace-e2e` | Stage 5 | Full end-to-end TRACE model |
+| `trace-e2e` | Stage 4 | Full end-to-end TRACE model |
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 TRACE/
 ├── src/
 │   ├── data/            # Dataset, augmentation, clip sampling
-│   ├── models/          # TRACE, TGAA, ATF, temporal encoder, LLaVA-LoRA
+│   ├── models/          # TRACE, TGAA, ATF, temporal encoder
 │   ├── train/           # Per-stage training scripts
 │   ├── eval/            # Evaluation
 │   └── utils/           # Config dataclasses, trainer utilities
@@ -188,7 +179,6 @@ TRACE/
 │   ├── run_segmentation.sh
 │   ├── run_temporal.sh
 │   ├── run_fusion.sh
-│   ├── run_llava.sh
 │   ├── run_e2e.sh
 │   ├── run_eval.sh
 │   ├── run_stage5_eval.sh
@@ -201,7 +191,7 @@ TRACE/
 
 ---
 
-## Citation
+## 📝 Citation
 
 ```bibtex
 @article{trace2026,
@@ -215,6 +205,6 @@ TRACE/
 
 ---
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

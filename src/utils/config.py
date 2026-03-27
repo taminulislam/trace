@@ -3,7 +3,7 @@
 Each config includes resume, checkpoint saving, and ETA tracking settings.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 import os
@@ -170,40 +170,8 @@ class FusionConfig(BaseTrainConfig):
 
 
 @dataclass
-class LLaVAConfig(BaseTrainConfig):
-    """Stage 4: LoRA LLaVA fine-tuning."""
-    stage_name: str = "llava"
-
-    epochs: int = 5
-    lora_lr: float = 2e-4
-    projection_lr: float = 1e-4
-    batch_size: int = 4
-    gradient_accumulation: int = 8
-
-    # LoRA
-    lora_rank: int = 16
-    lora_alpha: int = 32
-    lora_targets: list = field(default_factory=lambda: ["q_proj", "v_proj", "k_proj"])
-
-    # Model
-    llava_model_name: str = "liuhaotian/llava-v1.5-7b"
-    num_visual_tokens: int = 32
-    max_text_len: int = 256
-
-    # Data
-    descriptions_csv: str = str(PROJECT_ROOT / "annotations" / "behaviour_descriptions.csv")
-
-    gradient_checkpointing: bool = True
-
-    # Frozen model checkpoints
-    segmentation_checkpoint: Optional[str] = None
-    temporal_checkpoint: Optional[str] = None
-    fusion_checkpoint: Optional[str] = None
-
-
-@dataclass
 class EndToEndConfig(BaseTrainConfig):
-    """Stage 5: End-to-end fine-tuning."""
+    """Stage 4: End-to-end fine-tuning."""
     stage_name: str = "e2e"
 
     epochs: int = 20
@@ -222,13 +190,10 @@ class EndToEndConfig(BaseTrainConfig):
     tgaa_encoder_lr: float = 1e-5
     atf_lr: float = 1e-4
     temporal_adapter_lr: float = 5e-6
-    lora_lr: float = 2e-4
-    projection_lr: float = 1e-4
 
-    # Joint loss weights — cls upweighted since seg is already near-perfect
-    seg_loss_weight: float = 0.3
-    cls_loss_weight: float = 2.0
-    lm_loss_weight: float = 0.5
+    # Joint loss weights (lambda_seg=1.0, lambda_cls=0.5 per paper Eq. 8)
+    seg_loss_weight: float = 1.0
+    cls_loss_weight: float = 0.5
 
     gradient_checkpointing: bool = True
 
@@ -236,7 +201,6 @@ class EndToEndConfig(BaseTrainConfig):
     segmentation_checkpoint: Optional[str] = None
     temporal_checkpoint: Optional[str] = None
     fusion_checkpoint: Optional[str] = None
-    llava_checkpoint: Optional[str] = None
 
 
 @dataclass

@@ -2,8 +2,7 @@
 
 Provides:
   - ThermalFrameDataset: single-frame dataset for segmentation training (Stage 1)
-  - ThermalClipDataset: temporal clip dataset for temporal/fusion training (Stage 2-5)
-  - ThermalNarrationDataset: frame + description pairs for LLaVA training (Stage 4)
+  - ThermalClipDataset: temporal clip dataset for temporal/fusion/e2e training (Stage 2-4)
 """
 
 import os
@@ -174,75 +173,3 @@ class ThermalClipDataset(Dataset):
             "clip_id": row["clip_id"],
             "seq_id": str(row["seq_id"]),
         }
-
-
-class ThermalNarrationDataset(Dataset):
-    """Frame + description pairs for LLaVA fine-tuning (Stage 4).
-
-    Loads overlay frames and their corresponding behavioural descriptions.
-
-    Args:
-        descriptions_csv: path to behaviour_descriptions.csv
-        annotations_csv: path to annotations.csv (for file paths)
-        img_size: (H, W) resize target
-        tokenizer: HuggingFace tokenizer (if None, returns raw text)
-        max_text_len: max tokenized text length
-    """
-
-    def __init__(self, descriptions_csv: str = None,
-                 annotations_csv: str = None,
-                 img_size: tuple = (224, 224),
-                 tokenizer=None, max_text_len: int = 256):
-        if descriptions_csv is None:
-            descriptions_csv = str(PROJECT_ROOT / "annotations" / "behaviour_descriptions.csv")
-        if annotations_csv is None:
-            annotations_csv = str(PROJECT_ROOT / "annotations" / "annotations.csv")
-
-        desc_df = pd.read_csv(descriptions_csv)
-        ann_df = pd.read_csv(annotations_csv)
-        ann_df["seq_id"] = ann_df["seq_id"].astype(str).str.zfill(4)
-        desc_df["seq_id"] = desc_df["seq_id"].astype(str).str.zfill(4)
-
-        self.df = desc_df.merge(
-            ann_df[["frame_id", "overlay_path", "mask_path", "image_path"]],
-            on="frame_id", how="left",
-        )
-        self.img_size = img_size
-        self.tokenizer = tokenizer
-        self.max_text_len = max_text_len
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx: int) -> dict:
-        row = self.df.iloc[idx]
-
-        overlay = cv2.imread(str(PROJECT_ROOT / row["overlay_path"]))
-        overlay = cv2.resize(overlay, (self.img_size[1], self.img_size[0]))
-        overlay_t = torch.from_numpy(overlay).permute(2, 0, 1).float() / 255.0
-
-        mask = cv2.imread(str(PROJECT_ROOT / row["mask_path"]), cv2.IMREAD_GRAYSCALE)
-        mask = cv2.resize(mask, (self.img_size[1], self.img_size[0]),
-                          interpolation=cv2.INTER_NEAREST)
-        mask_t = torch.from_numpy((mask > 127).astype(np.float32)).unsqueeze(0)
-
-        result = {
-            "overlay": overlay_t,
-            "mask": mask_t,
-            "class_id": int(row["class_id"]),
-            "description": row["description"],
-            "frame_id": row["frame_id"],
-        }
-
-        if self.tokenizer is not None:
-            encoded = self.tokenizer(
-                row["description"],
-                max_length=self.max_text_len,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-            )
-            result["input_ids"] = encoded["input_ids"].squeeze(0)
-            result["attention_mask"] = encoded["attention_mask"].squeeze(0)
-
-        return result

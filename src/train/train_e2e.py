@@ -1,11 +1,10 @@
-"""Stage 5: End-to-End Joint Fine-tuning (4-GPU DDP).
+"""Stage 4: End-to-End Joint Fine-tuning (DDP).
 
 Unfreeze all components with differential learning rates:
-  TGAA encoder: 1e-5,  ATF: 1e-4,  Temporal adapter: 5e-6,
-  LoRA: 2e-4,  Projection MLP: 1e-4
+  TGAA encoder: 1e-5,  ATF: 1e-4,  Temporal adapter: 5e-6
 
-Joint loss: seg_loss + 0.5*cls_loss + 0.5*lm_loss
-15 epochs, batch_size=8, gradient checkpointing enabled.
+Joint loss: lambda_seg * (BCE + Dice) + lambda_cls * CE
+(lambda_seg=1.0, lambda_cls=0.5 per paper Eq. 8)
 """
 
 import argparse
@@ -40,17 +39,15 @@ from src.utils.trainer import (CheckpointManager, ETATracker, MetricsLogger,
 class EndToEndModel(nn.Module):
     """Wraps all components for end-to-end training."""
 
-    def __init__(self, seg_model, atf_module, temporal_model, llava_model=None,
+    def __init__(self, seg_model, atf_module, temporal_model,
                  num_classes=3, feature_dim=256):
         super().__init__()
         self.seg_model = seg_model
         self.atf = atf_module
         self.temporal = temporal_model
-        self.llava = llava_model  # Optional — can be None
         self.classifier = nn.Linear(feature_dim, num_classes)
 
-    def forward(self, overlay, mask, intensity, input_ids=None,
-                attention_mask=None, labels_text=None):
+    def forward(self, overlay, mask, intensity):
         seg_out = self.seg_model(overlay, thermal_intensity=intensity,
                                   binary_mask=mask)
         seg_logits = seg_out["seg_logits"]
@@ -60,24 +57,13 @@ class EndToEndModel(nn.Module):
         atf_out = self.atf(mask, stage4_feat, bg_overlay)
         fused = atf_out["fused"]
 
-        # Temporal embedding is not available at frame level — use zeros as placeholder
-        temporal_emb = torch.zeros(overlay.size(0), 256, device=overlay.device)
-
         cls_logits = self.classifier(fused)
 
-        result = {
+        return {
             "seg_logits": seg_logits,
             "cls_logits": cls_logits,
             "fused": fused,
-            "temporal_emb": temporal_emb,
         }
-
-        if input_ids is not None and self.llava is not None:
-            llava_out = self.llava(fused, temporal_emb, input_ids,
-                                   attention_mask, labels_text)
-            result["lm_loss"] = llava_out["loss"]
-
-        return result
 
 
 def dice_loss(pred, target, smooth=1.0):
@@ -118,13 +104,12 @@ def main():
     parser.add_argument("--seg_checkpoint", type=str, default=None)
     parser.add_argument("--temporal_checkpoint", type=str, default=None)
     parser.add_argument("--fusion_checkpoint", type=str, default=None)
-    parser.add_argument("--llava_checkpoint", type=str, default=None)
     args = parser.parse_args()
 
     rank, world_size, device = setup_ddp()
     config = EndToEndConfig()
     set_seed(config.seed + rank)
-    print_header("Stage 5: End-to-End Joint Fine-tuning", config)
+    print_header("Stage 4: End-to-End Joint Fine-tuning", config)
     if is_main_process():
         print(f"World size: {world_size} GPUs")
 
@@ -161,26 +146,7 @@ def main():
         if is_main_process():
             print(f"Loaded ATF: {ckpt_path}")
 
-    # LLaVA is optional — skip if not available
-    llava_model = None
-    if args.llava_checkpoint or config.llava_checkpoint:
-        try:
-            from src.models.llava_lora import TRACELLaVA
-            llava_model = TRACELLaVA(lora_rank=16, lora_alpha=32)
-            ckpt_path = args.llava_checkpoint or config.llava_checkpoint
-            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-            llava_model.load_state_dict(ckpt["model_state_dict"])
-            if is_main_process():
-                print(f"Loaded LLaVA: {ckpt_path}")
-        except (ImportError, ModuleNotFoundError):
-            if is_main_process():
-                print("  ⚠ LLaVA not available, running without language model")
-            llava_model = None
-    else:
-        if is_main_process():
-            print("  ℹ Running without LLaVA (seg + classification only)")
-
-    e2e_model = EndToEndModel(seg_model, atf_module, temporal_model, llava_model)
+    e2e_model = EndToEndModel(seg_model, atf_module, temporal_model)
     e2e_model = wrap_model_ddp(e2e_model, device)
 
     # Differential learning rates
@@ -192,13 +158,6 @@ def main():
                     if "adapter" in n], "lr": config.temporal_adapter_lr},
         {"params": list(raw.classifier.parameters()), "lr": config.atf_lr},
     ]
-    if raw.llava is not None:
-        param_groups.extend([
-            {"params": [p for n, p in raw.llava.named_parameters()
-                        if "lora" in n.lower() and p.requires_grad], "lr": config.lora_lr},
-            {"params": [p for n, p in raw.llava.named_parameters()
-                        if "projection" in n.lower() and p.requires_grad], "lr": config.projection_lr},
-        ])
     optimizer = torch.optim.AdamW(param_groups, weight_decay=config.weight_decay)
 
     # Data
@@ -362,7 +321,7 @@ def main():
     logger.finish()
     cleanup_ddp()
     if is_main_process():
-        print("\nStage 5 complete.")
+        print("\nStage 4 complete.")
 
 
 if __name__ == "__main__":
