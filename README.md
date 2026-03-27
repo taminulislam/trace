@@ -191,17 +191,6 @@ TRACE/
 
 ---
 
-## 📝 Citation
-
-```bibtex
-@article{trace2026,
-  title   = {TRACE},
-  author  = {},
-  year    = {2026},
-}
-```
-
-> Citation will be updated upon publication.
 
 ---
 
